@@ -1,19 +1,7 @@
 class Player {
-    position: {
-        x: number
-        y: number
-    } = {
-        x: 0,
-        y: 0
-    };
+    character: Character;
 
-    wantToMove: {
-        x: number
-        y: number
-    } = {
-        x: 0,
-        y: 0
-    };
-
-    rotation: number = 0;
+    constructor(character: Character) {
+        this.character = character;
+    }
 }

@@ -1,3 +1,48 @@
+var Bullet = (function () {
+    function Bullet(name, x, y, angle, speed) {
+        if (x === void 0) { x = 0; }
+        if (y === void 0) { y = 0; }
+        if (angle === void 0) { angle = 0; }
+        if (speed === void 0) { speed = 0; }
+        this.position = {
+            x: 0,
+            y: 0
+        };
+        this.size = 0.5;
+        this.name = name;
+        this.position.x = x;
+        this.position.y = y;
+        this.angle = angle;
+        this.speed = speed;
+    }
+    return Bullet;
+})();
+
+var Character = (function () {
+    function Character(name, x, y) {
+        if (x === void 0) { x = 0; }
+        if (y === void 0) { y = 0; }
+        this.position = {
+            x: 0,
+            y: 0
+        };
+        this.wantToMove = {
+            x: 0,
+            y: 0
+        };
+        this.size = 1;
+        this.rotation = 0;
+        this.name = name;
+        this.position.x = x;
+        this.position.y = y;
+    }
+    Character.prototype.shot = function () {
+        var bullet = new Bullet("plasma", this.position.x, this.position.y, this.rotation, -0.1);
+        return bullet;
+    };
+    return Character;
+})();
+
 var Map = (function () {
     function Map() {
         this.tiles = [];
@@ -34,24 +79,17 @@ var Game = (function () {
             "W": "moveUp",
             "S": "moveDown",
             "A": "rotateLeft",
-            "D": "rotateRight"
+            "D": "rotateRight",
+            " ": "shoot"
         };
         this.keysPressed = {};
+        this.ready = false;
         this.scene = scene;
         this.camera = camera;
-        console.log(this.camera.position);
     }
     Game.prototype.initialize = function (mapCreator, player) {
         var _this = this;
         this.player = player;
-        mapCreator.createMap("mockworld", function (map) {
-            _this.map = map;
-            _this.player.position.x = _this.map.startingPosition[0];
-            _this.player.position.y = _this.map.startingPosition[1];
-            var drawer = new CubicTreeJsDrawer(_this.scene, map);
-            drawer.drawMap();
-            _this.world = new World(_this.map, _this.player);
-        });
         document.addEventListener("keydown", function (event) {
             var keyCharacter = String.fromCharCode(event['keyCode']);
             if (_this.keyMap[keyCharacter]) {
@@ -64,30 +102,47 @@ var Game = (function () {
                 _this.keysPressed[_this.keyMap[keyCharacter]] = false;
             }
         });
+        mapCreator.createMap("mockworld", function (map) {
+            _this.map = map;
+            _this.player.character.position.x = _this.map.startingPosition[0];
+            _this.player.character.position.y = _this.map.startingPosition[1];
+            _this.drawer = new CubicTreeJsDrawer(_this.scene, map);
+            _this.drawer.drawMap();
+            _this.world = new World(_this.map, _this.player);
+            var character = new Character("spider", 3, 4);
+            _this.world.characters.push(character);
+            _this.drawer.addObject(character);
+            _this.ready = true;
+        });
     };
     Game.prototype.process = function () {
+        if (!this.ready) {
+            return;
+        }
         for (var key in this.keysPressed) {
             if (this.keysPressed[key]) {
                 if (key == "rotateLeft" || key == "rotateRight") {
                     var direction = (key == "rotateRight") ? -1 : 1;
-                    //this.camera.rotation.y += 0.1;
                     this.acceleration['rotation'] += 0.2 * direction * this.speed['rotation'];
                 }
                 if (key == "moveUp" || key == "moveDown") {
                     var direction = (key == "moveUp") ? -1 : 1;
-                    //this.camera.position.x += Math.sin(this.camera.rotation.y) * direction;
-                    //this.camera.position.z += Math.cos(this.camera.rotation.y) * direction;
                     this.acceleration['x'] += Math.sin(this.camera.rotation.y) * direction * this.speed['walk'];
                     this.acceleration['z'] += Math.cos(this.camera.rotation.y) * direction * this.speed['walk'];
                 }
+                if (key == "shoot") {
+                    var bullet = this.player.character.shot();
+                    this.world.bullets.push(bullet);
+                    this.drawer.addObject(bullet);
+                }
             }
         }
-        this.player.wantToMove.x += this.acceleration['x'];
-        this.player.wantToMove.y += this.acceleration['z'];
+        this.player.character.wantToMove.x += this.acceleration['x'];
+        this.player.character.wantToMove.y += this.acceleration['z'];
         if (this.world) {
             this.world.move();
         }
-        this.player.rotation += this.acceleration['rotation'];
+        this.player.character.rotation += this.acceleration['rotation'];
         var slowDownProperties = ['x', 'z', 'rotation'];
         for (var k in slowDownProperties) {
             var property = slowDownProperties[k];
@@ -102,9 +157,10 @@ var Game = (function () {
                 }
             }
         }
-        this.camera.position.x = this.player.position.x;
-        this.camera.position.z = this.player.position.y;
-        this.camera.rotation.y = this.player.rotation;
+        this.camera.position.x = this.player.character.position.x;
+        this.camera.position.z = this.player.character.position.y;
+        this.camera.rotation.y = this.player.character.rotation;
+        this.drawer.refresh();
     };
     return Game;
 })();
@@ -112,42 +168,68 @@ var Game = (function () {
 
 
 var Player = (function () {
-    function Player() {
-        this.position = {
-            x: 0,
-            y: 0
-        };
-        this.wantToMove = {
-            x: 0,
-            y: 0
-        };
-        this.rotation = 0;
+    function Player(character) {
+        this.character = character;
     }
     return Player;
 })();
 
 var World = (function () {
     function World(map, player) {
+        this.characters = [];
+        this.bullets = [];
         this.player = player;
         this.map = map;
+        this.characters.push(player.character);
     }
     World.prototype.move = function () {
-        var canMove = false;
-        var line = this.map.tiles[Math.round(this.player.wantToMove.y)];
-        if (line) {
-            var tile = line[Math.round(this.player.wantToMove.x)];
-            if (tile && !(tile instanceof BlockTile)) {
-                canMove = true;
+        this.moveCharacters();
+        this.moveBullets();
+    };
+    World.prototype.moveCharacters = function () {
+        for (var k in this.characters) {
+            var character = this.characters[k];
+            var canMove = false;
+            var line = this.map.tiles[Math.round(character.wantToMove.y)];
+            if (line) {
+                var tile = line[Math.round(character.wantToMove.x)];
+                if (tile && !(tile instanceof BlockTile)) {
+                    canMove = true;
+                }
+            }
+            if (canMove) {
+                character.position.x = character.wantToMove.x;
+                character.position.y = character.wantToMove.y;
+            }
+            else {
+                character.wantToMove.x = character.position.x;
+                character.wantToMove.y = character.position.y;
             }
         }
-        if (canMove) {
-            this.player.position.x = this.player.wantToMove.x;
-            this.player.position.y = this.player.wantToMove.y;
-        }
-        else {
-            this.player.wantToMove.x = this.player.position.x;
-            this.player.wantToMove.y = this.player.position.y;
-        }
+    };
+    World.prototype.moveBullets = function () {
+        var _this = this;
+        this.bullets.map(function (bullet, index) {
+            var canMove = false;
+            var wantsToGo = {
+                x: bullet.position.x + Math.sin(bullet.angle) * bullet.speed,
+                y: bullet.position.y + Math.cos(bullet.angle) * bullet.speed
+            };
+            var line = _this.map.tiles[Math.round(wantsToGo.y)];
+            if (line) {
+                var tile = line[Math.round(wantsToGo.x)];
+                if (tile && !(tile instanceof BlockTile)) {
+                    canMove = true;
+                }
+            }
+            if (canMove) {
+                bullet.position.x = wantsToGo.x;
+                bullet.position.y = wantsToGo.y;
+            }
+            else {
+                bullet.speed = 0;
+            }
+        });
     };
     return World;
 })();
@@ -164,6 +246,7 @@ var Tile = (function () {
 var CubicTreeJsDrawer = (function () {
     function CubicTreeJsDrawer(scene, map) {
         this.materials = {};
+        this.objectSprites = [];
         this.blockScale = 1;
         this.scene = scene;
         this.map = map;
@@ -192,6 +275,24 @@ var CubicTreeJsDrawer = (function () {
     CubicTreeJsDrawer.prototype.placeCameraAtStartingPoint = function (camera) {
         camera.position.x = this.blockScale * this.map.startingPosition[0] + (this.blockScale / 2);
         camera.position.z = this.blockScale * this.map.startingPosition[1] + (this.blockScale / 2);
+    };
+    CubicTreeJsDrawer.prototype.addObject = function (object) {
+        var material = new THREE.SpriteMaterial({ map: THREE.ImageUtils.loadTexture("sprites/" + object.name + ".png"), color: 0xffffff, fog: true });
+        var sprite = new THREE.Sprite(material);
+        var objectSprite = new ObjectSprite(object, sprite);
+        this.scene.add(objectSprite.sprite);
+        console.log(object.position);
+        objectSprite.sprite.position.x = object.position.x;
+        objectSprite.sprite.position.z = object.position.y;
+        objectSprite.sprite.scale.y = object.size;
+        objectSprite.sprite.scale.x = object.size;
+        this.objectSprites.push(objectSprite);
+    };
+    CubicTreeJsDrawer.prototype.refresh = function () {
+        this.objectSprites.map(function (objectSprite) {
+            objectSprite.sprite.position.x = objectSprite.object.position.x;
+            objectSprite.sprite.position.z = objectSprite.object.position.y;
+        });
     };
     return CubicTreeJsDrawer;
 })();
@@ -247,4 +348,14 @@ var DnmapFileMaps = (function () {
         });
     };
     return DnmapFileMaps;
+})();
+
+
+
+var ObjectSprite = (function () {
+    function ObjectSprite(object, sprite) {
+        this.object = object;
+        this.sprite = sprite;
+    }
+    return ObjectSprite;
 })();

@@ -1,31 +1,70 @@
 class World {
     player: Player;
     map: Map;
+    characters: Character[] = [];
+    bullets: Bullet[] = [];
 
     constructor(map: Map, player: Player) {
         this.player = player;
         this.map = map;
+
+        this.characters.push(player.character);
     }
 
     move() {
-        var canMove = false;
+        this.moveCharacters();
+        this.moveBullets();
+    }
 
-        var line = this.map.tiles[Math.round(this.player.wantToMove.y)];
+    private moveCharacters() {
+        for (var k in this.characters) {
+            var character = this.characters[k];
+            var canMove = false;
 
-        if (line) {
-            var tile = line[Math.round(this.player.wantToMove.x)];
+            var line = this.map.tiles[Math.round(character.wantToMove.y)];
 
-            if (tile && !(tile instanceof BlockTile)) {
-                canMove = true;
+            if (line) {
+                var tile = line[Math.round(character.wantToMove.x)];
+
+                if (tile && !(tile instanceof BlockTile)) {
+                    canMove = true;
+                }
+            }
+
+            if (canMove) {
+                character.position.x = character.wantToMove.x;
+                character.position.y = character.wantToMove.y;
+            } else {
+                character.wantToMove.x = character.position.x;
+                character.wantToMove.y = character.position.y;
             }
         }
+    }
 
-        if (canMove) {
-            this.player.position.x = this.player.wantToMove.x;
-            this.player.position.y = this.player.wantToMove.y;
-        } else {
-            this.player.wantToMove.x = this.player.position.x;
-            this.player.wantToMove.y = this.player.position.y;
-        }
+    private moveBullets() {
+        this.bullets.map((bullet, index) => {
+            var canMove = false;
+            var wantsToGo = {
+                x: bullet.position.x + Math.sin(bullet.angle) * bullet.speed,
+                y: bullet.position.y + Math.cos(bullet.angle) * bullet.speed
+            };
+
+            var line = this.map.tiles[Math.round(wantsToGo.y)];
+
+            if (line) {
+                var tile = line[Math.round(wantsToGo.x)];
+
+                if (tile && !(tile instanceof BlockTile)) {
+                    canMove = true;
+                }
+            }
+
+            if (canMove) {
+                bullet.position.x = wantsToGo.x;
+                bullet.position.y = wantsToGo.y;
+            } else {
+                bullet.speed = 0;
+            }
+        });
     }
 }

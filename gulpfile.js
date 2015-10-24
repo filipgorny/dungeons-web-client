@@ -10,7 +10,8 @@ var src = {
     "ts": "src/**/*.ts",
     "html": "templates/**/*",
     textures: "resources/textures/*.jpg",
-    maps: "resources/map/*.dnmap"
+    maps: "resources/map/*.dnmap",
+    sprites: "resources/sprites/*.png"
 };
 
 gulp.task("bower-files", function() {
@@ -23,6 +24,10 @@ gulp.task("templates", function() {
 
 gulp.task("textures", function() {
     gulp.src(src.textures).pipe(gulp.dest("app/textures"));
+});
+
+gulp.task("sprites", function() {
+    gulp.src(src.sprites).pipe(gulp.dest("app/sprites"));
 });
 
 gulp.task("maps", function() {
@@ -56,6 +61,6 @@ gulp.task('watch', function () {
     });
 });
 
-gulp.task('build', ['bower-files', 'scripts', 'templates', 'maps', 'textures']);
+gulp.task('build', ['bower-files', 'scripts', 'templates', 'maps', 'textures', 'sprites']);
 
 gulp.task('default', ['build', 'watch', 'connect']);

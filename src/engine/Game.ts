@@ -27,32 +27,23 @@ class Game {
         "W": "moveUp",
         "S": "moveDown",
         "A": "rotateLeft",
-        "D": "rotateRight"
+        "D": "rotateRight",
+        " ": "shoot"
     };
 
     private keysPressed: {} = {};
 
+    private drawer: Drawer;
+
+    private ready: boolean = false;
+
     constructor(scene: THREE.Scene, camera: THREE.Camera) {
         this.scene = scene;
         this.camera = camera;
-
-        console.log(this.camera.position);
     }
 
     initialize(mapCreator: MapCreator, player: Player) {
         this.player = player;
-
-        mapCreator.createMap("mockworld", (map) => {
-            this.map = map;
-            this.player.position.x = this.map.startingPosition[0];
-            this.player.position.y = this.map.startingPosition[1];
-
-            var drawer = new CubicTreeJsDrawer(this.scene, map);
-
-            drawer.drawMap();
-
-            this.world = new World(this.map, this.player);
-        });
 
         document.addEventListener("keydown", (event) => {
             var keyCharacter = String.fromCharCode(event['keyCode']);
@@ -69,38 +60,63 @@ class Game {
                 this.keysPressed[this.keyMap[keyCharacter]] = false;
             }
         });
+
+        mapCreator.createMap("mockworld", (map) => {
+            this.map = map;
+            this.player.character.position.x = this.map.startingPosition[0];
+            this.player.character.position.y = this.map.startingPosition[1];
+
+            this.drawer = new CubicTreeJsDrawer(this.scene, map);
+
+            this.drawer.drawMap();
+
+            this.world = new World(this.map, this.player);
+
+            var character = new Character("spider", 3, 4);
+            this.world.characters.push(character);
+            this.drawer.addObject(character);
+
+            this.ready = true;
+        });
     }
 
     process() {
+        if (!this.ready) {
+            return;
+        }
+
         for (var key in this.keysPressed) {
             if (this.keysPressed[key]) {
 
                 if (key == "rotateLeft" || key == "rotateRight") {
                     var direction = (key == "rotateRight") ? -1 : 1;
-                    //this.camera.rotation.y += 0.1;
+
                     this.acceleration['rotation'] += 0.2 * direction * this.speed['rotation'];
                 }
 
                 if (key == "moveUp" || key == "moveDown") {
                     var direction = (key == "moveUp") ? -1 : 1;
 
-                    //this.camera.position.x += Math.sin(this.camera.rotation.y) * direction;
-                    //this.camera.position.z += Math.cos(this.camera.rotation.y) * direction;
-
                     this.acceleration['x'] += Math.sin(this.camera.rotation.y) * direction * this.speed['walk'];
                     this.acceleration['z'] += Math.cos(this.camera.rotation.y) * direction * this.speed['walk'];
+                }
+
+                if (key == "shoot") {
+                    var bullet = this.player.character.shot();
+                    this.world.bullets.push(bullet);
+                    this.drawer.addObject(bullet);
                 }
             }
         }
 
-        this.player.wantToMove.x += this.acceleration['x'];
-        this.player.wantToMove.y += this.acceleration['z'];
+        this.player.character.wantToMove.x += this.acceleration['x'];
+        this.player.character.wantToMove.y += this.acceleration['z'];
 
         if (this.world) {
             this.world.move();
         }
 
-        this.player.rotation += this.acceleration['rotation'];
+        this.player.character.rotation += this.acceleration['rotation'];
 
         var slowDownProperties = ['x', 'z', 'rotation'];
 
@@ -122,8 +138,10 @@ class Game {
             }
         }
 
-        this.camera.position.x = this.player.position.x;
-        this.camera.position.z = this.player.position.y;
-        this.camera.rotation.y = this.player.rotation;
+        this.camera.position.x = this.player.character.position.x;
+        this.camera.position.z = this.player.character.position.y;
+        this.camera.rotation.y = this.player.character.rotation;
+
+        this.drawer.refresh();
     }
 }
